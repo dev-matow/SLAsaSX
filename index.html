@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAL Tracker — CJ Mart</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --white: #ffffff;
+    --navy: #1a3a5c;
+    --navy-mid: #2c5282;
+    --border: #d1dbe8;
+    --text: #1a202c;
+    --text-muted: #718096;
+    --yellow: #f6c90e;
+    --yellow-text: #744210;
+    --green: #38a169;
+    --font: 'Segoe UI', Tahoma, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; }
+
+  .topbar {
+    background: var(--navy); color: white;
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .topbar-title { font-size: 15px; font-weight: 700; }
+  .topbar-title span { color: var(--yellow); }
+  .topbar-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select {
+    padding: 6px 10px; border-radius: 6px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1); color: white; font-size: 13px; cursor: pointer; outline: none;
+  }
+  select option { background: #1a3a5c; }
+  .btn { padding: 7px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .btn-refresh { background: var(--yellow); color: var(--yellow-text); }
+  .btn-refresh:hover { background: #e6b800; }
+  .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spin { display: inline-block; }
+  .spin.loading { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .legend {
+    padding: 7px 20px; background: white; border-bottom: 1px solid var(--border);
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
+  .legend-dot { width: 13px; height: 13px; border-radius: 3px; }
+
+  .table-wrapper { overflow: auto; max-height: calc(100vh - 105px); }
+
+  table { border-collapse: collapse; width: max-content; min-width: 100%; }
+
+  /* FIXED COLS */
+  .fc { position: sticky; z-index: 5; background: white; }
+  .fc0 { left: 0;    min-width: 60px;  max-width: 60px; }
+  .fc1 { left: 60px; min-width: 60px;  max-width: 60px; }
+  .fc2 { left: 120px; min-width: 90px; max-width: 90px; }
+  .fc3 { left: 210px; min-width: 120px; max-width: 120px; }
+  .fc4 { left: 330px; min-width: 90px;  max-width: 90px; }
+  .fc5 { left: 420px; min-width: 80px;  max-width: 80px; }
+
+  /* HEADER */
+  thead tr.row-months th {
+    background: var(--navy); color: white;
+    text-align: center; padding: 6px 4px;
+    font-size: 12px; font-weight: 700;
+    border-right: 2px solid rgba(255,255,255,0.2);
+    white-space: nowrap;
+    position: sticky; top: 0; z-index: 20;
+  }
+  thead tr.row-weeks th {
+    background: #2d4a6e; color: rgba(255,255,255,0.85);
+    text-align: center; padding: 5px 2px; font-size: 11px;
+    border-right: 1px solid rgba(255,255,255,0.15);
+    white-space: nowrap; min-width: 38px;
+    position: sticky; top: 29px; z-index: 20;
+  }
+  thead th.fc { z-index: 25 !important; }
+  th.wlast { border-right: 2px solid rgba(255,255,255,0.3) !important; }
+
+  /* BODY CELLS */
+  tbody td {
+    padding: 5px 3px; text-align: center;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid #e8edf3;
+    white-space: nowrap;
+  }
+  tbody td.wlast { border-right: 2px solid var(--border); }
+  tbody td.fc { text-align: left; padding: 5px 8px; border-right: 1px solid var(--border); }
+
+  /* ROW TYPES */
+  tr.row-team td {
+    background: #dbe6f5 !important;
+    font-weight: 700; color: var(--navy);
+    font-size: 12px; padding: 5px 8px;
+  }
+  tr.row-sa td {
+    background: #eef4fb !important;
+    font-weight: 600; color: #2c5282;
+    font-size: 12px; padding: 4px 8px;
+  }
+  tr.row-site td { background: white; }
+  tr.row-site:hover td { background: #f0f7ff !important; }
+  tr.row-site:hover td.fc { background: #e6f0ff !important; }
+
+  tr.row-total-sa-esanor td { background: #fffbeb !important; font-weight: 600; font-size: 12px; }
+  tr.row-total-sa-site    td { background: #f0fff4 !important; font-weight: 600; font-size: 12px; }
+  tr.row-total-team-esanor td { background: #fef3c7 !important; font-weight: 700; font-size: 12px; border-top: 2px solid #f6c90e; }
+  tr.row-total-team-site   td { background: #dcfce7 !important; font-weight: 700; font-size: 12px; border-bottom: 3px solid #38a169; }
+
+  .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+  .badge-e { background: #f6c90e; color: #744210; }
+  .badge-m { background: #90cdf4; color: #1a365d; }
+  .badge-s { background: #38a169; color: white; }
+
+  .cnt-e { color: #92400e; font-weight: 700; }
+  .cnt-s { color: #276749; font-weight: 700; }
+  .cnt-0 { color: #cbd5e0; }
+
+  .spacer td { height: 8px; background: var(--bg) !important; border: none !important; }
+
+  .last-updated { font-size: 11px; color: var(--text-muted); text-align: right; padding: 5px 16px; }
+  .mock-warn { background: #fffbeb; border-bottom: 1px solid #f6c90e; padding: 6px 20px; font-size: 12px; color: #744210; }
+
+  /* PASSWORD GATE */
+  .gate-overlay {
+    position: fixed; inset: 0; background: #1a3a5c;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; flex-direction: column; gap: 16px;
+  }
+  .gate-box {
+    background: white; border-radius: 16px; padding: 40px;
+    text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    min-width: 320px;
+  }
+  .gate-logo { font-size: 32px; margin-bottom: 8px; }
+  .gate-title { font-size: 18px; font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
+  .gate-sub { font-size: 13px; color: #718096; margin-bottom: 24px; }
+  .gate-input {
+    width: 100%; padding: 12px 16px; border-radius: 8px;
+    border: 2px solid #cbd5e0; font-size: 15px; outline: none;
+    text-align: center; letter-spacing: 2px;
+    transition: border-color 0.2s;
+  }
+  .gate-input:focus { border-color: #2b6cb0; }
+  .gate-input.error { border-color: #e53e3e; animation: shake 0.3s; }
+  .gate-btn {
+    width: 100%; margin-top: 12px; padding: 12px;
+    background: #1a3a5c; color: white; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .gate-btn:hover { background: #2c5282; }
+  .gate-err { color: #e53e3e; font-size: 13px; margin-top: 8px; min-height: 20px; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
+  }
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-box">
+    <div class="gate-logo">🔐</div>
+    <div class="gate-title">SAL Tracker — CJ Mart</div>
+    <div class="gate-sub">กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน</div>
+    <input class="gate-input" id="gateInput" type="password" placeholder="รหัสผ่าน"
+      onkeydown="if(event.key==='Enter')checkPass()">
+    <button class="gate-btn" onclick="checkPass()">เข้าสู่ระบบ</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-title">📍 SAL Tracker — <span>CJ Mart</span></div>
+  <div class="topbar-controls">
+    <select id="filterTeam" onchange="onTeamChange()"><option value="">ทุก Team</option></select>
+    <select id="filterSA"   onchange="renderFiltered()"><option value="">ทุก SA</option></select>
+    <input id="searchSite" type="text" placeholder="🔍 Site Code / ชื่อไซท์..." oninput="renderFiltered()"
+      style="padding:6px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:white;font-size:13px;width:200px;outline:none;"
+      onfocus="this.style.borderColor='#f6c90e'" onblur="this.style.borderColor='rgba(255,255,255,0.3)'">
+    <input id="searchVan" type="date" onchange="renderFiltered()"
+      style="padding:6px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:white;font-size:13px;width:155px;outline:none;cursor:pointer;"
+      onfocus="this.style.borderColor='#f6c90e'" onblur="this.style.borderColor='rgba(255,255,255,0.3)'">
+    <select id="searchProvince" onchange="renderFiltered()"><option value="">📍 ทุกจังหวัด</option></select>
+    <button class="btn btn-refresh" id="refreshBtn" onclick="loadData()">
+      <span class="spin" id="spinIcon">↻</span> Refresh
+    </button>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f6c90e"></div>รับใบเสนอราคา</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#90cdf4"></div>เสนอ M1</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#38a169"></div>ขึ้นอนุมัติ Site</div>
+</div>
+
+<div id="mockWarn"></div>
+<div class="table-wrapper" id="tableWrapper"><div style="text-align:center;padding:60px;color:#718096">⏳ กำลังโหลด...</div></div>
+<div class="last-updated" id="lastUpdated"></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbz6FgN_HGt8ULpql_AoWSEcZl87mSNM1aHxdp0aWxuZgHnct3wHxDtfV4hlBSkKI2Y-/exec";
+
+const MOCK = [
+  ["Team","SA","Site Code","ชื่อไซท์","วันที่ขึ้นรถตู้","จังหวัด","รับใบเสนอราคา","เสนอ M1","ขึ้นอนุมัติ Site"],
+  ["Team D","เม่","CJX68-0253","ชอยคูขวาง 11","29/01/2026","ปทุมธานี","15/01/2026","29/01/2026","15/02/2026"],
+  ["Team D","เม่","CJX69-0058","คลองหลวง ซ.8","07/02/2026","ปทุมธานี","12/01/2026","","29/01/2026"],
+  ["Team D","เม่","CJX69-0092","ถนนเลียบคลองเปรม","30/03/2026","ปทุมธานี","10/02/2026","","07/03/2026"],
+  ["Team D","เม่","CJX69-0138","หมู่บ้านแนวไม้","06/04/2026","นนทบุรี","30/03/2026","30/03/2026","06/04/2026"],
+  ["Team D","เม่","CJX69-0023","เลียบคลองบางเลื่อ","16/04/2026","ปทุมธานี","24/02/2026","26/02/2026","16/04/2026"],
+  ["Team D","นก","CJX69-0189","เลียบคลองเกาะแก้ว","19/04/2026","ปทุมธานี","10/02/2026","",""],
+  ["Team D","นก","CJX69-0201","ตลาดสี่มุมเมือง","25/03/2026","ปทุมธานี","01/03/2026","15/03/2026","25/03/2026"],
+  ["Team B","แบบ","CJX69-0139","เพชรเกษม87","11/05/2026","สมุทรสาคร","01/03/2026","",""],
+  ["Team B","แบบ","CJX69-0208","สวัสดิการ 2","11/05/2026","กรุงเทพฯ","15/03/2026","",""],
+  ["Team B","แบบ","CJX69-0047","บ้านอ่ำแพง","27/03/2026","สมุทรสาคร","10/02/2026","20/02/2026","27/03/2026"],
+  ["Team B","ปลา","CJX69-0084","บ้านรัฐเอื้ออาทร สาย4","27/03/2026","กรุงเทพฯ","01/02/2026","10/02/2026","27/03/2026"],
+  ["Team B","ปลา","CJX68-0270","วัดหลักสี่ราษฎร์สโมสร","30/01/2026","สมุทรสาคร","10/01/2026","","30/01/2026"],
+  ["Team E","ปอย","CJX68-0229","กรอกยายชา","12/01/2026","ระยอง","05/01/2026","",""],
+  ["Team E","ปอย","CJX69-0122","คลองนุ้ห","28/04/2026","ระยอง","10/03/2026","20/03/2026","28/04/2026"],
+  ["Team E","ปอย","CJX68-0245","ซอยสุพรรณ บ่อวิน","02/02/2026","ระยอง","20/01/2026","","02/02/2026"],
+  ["Team A","ปังปอน","CJX68-0172","ร่าพัน จันทบุรี","12/01/2026","จันทบุรี","05/01/2026","",""],
+  ["Team A","ปังปอน","CJX69-0117","ปากน้ำแขมหนู","27/04/2026","จันทบุรี","15/03/2026","25/03/2026","27/04/2026"],
+  ["Team A","มิ้ง","CJX68-0031","ตลาดนัดสามผ่าน","02/02/2026","จันทบุรี","20/01/2026","","02/02/2026"],
+  ["Team A","มิ้ง","CJX68-0250","ตลาดนัดสาธารณาย","02/02/2026","จันทบุรี","01/02/2026","10/02/2026",""],
+];
+
+let allSites = [];
+
+// ---- DATE ----
+function parseDate(str) {
+  if (!str) return null;
+  str = String(str).trim();
+  if (!str) return null;
+  // ISO datetime: 2026-06-07T17:00:00.000Z
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  // d/M/yyyy หรือ DD/MM/YYYY
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  // YYYY-MM-DD
+  m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(str); return isNaN(d) ? null : d;
+}
+const TH_M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const fmtShort = d => d ? `${d.getDate()} ${TH_M[d.getMonth()]}` : '';
+const fmtFull  = d => d ? `${d.getDate()} ${TH_M[d.getMonth()]} ${d.getFullYear()-1957+2500}` : '';
+
+function parseRows(raw) {
+  return raw.slice(1).map(r=>({
+    team: String(r[0]||'').trim(), sa: String(r[1]||'').trim(),
+    code: String(r[2]||'').trim(), name: String(r[3]||'').trim(),
+    province: String(r[4]||'').trim(), vanDate: parseDate(r[5]),
+    esanor: parseDate(r[6]), m1: parseDate(r[7]), site: parseDate(r[8]),
+  })).filter(r=>r.team||r.code);
+}
+
+// ---- MONTHS ----
+function buildMonths(sites) {
+  let allD = [];
+  sites.forEach(s=>['esanor','m1','site'].forEach(f=>{if(s[f])allD.push(s[f]);}));
+  if(!allD.length) return [];
+  const minD=new Date(Math.min(...allD.map(d=>d.getTime())));
+  const maxD=new Date(Math.max(...allD.map(d=>d.getTime())));
+  const months=[];
+  let cur=new Date(minD.getFullYear(),minD.getMonth(),1);
+  const end=new Date(maxD.getFullYear(),maxD.getMonth(),1);
+  while(cur<=end){ months.push({y:cur.getFullYear(),mo:cur.getMonth()}); cur=new Date(cur.getFullYear(),cur.getMonth()+1,1); }
+  return months;
+}
+
+// ---- WEEK LOGIC ----
+function weekEnd(m,w) {
+  const lastDay = new Date(m.y,m.mo+1,0).getDate();
+  return new Date(m.y, m.mo, w===4 ? lastDay : w*7);
+}
+function inWeek(date,m,w) {
+  if(!date) return false;
+  const from=new Date(m.y,m.mo,(w-1)*7+1);
+  const to=weekEnd(m,w);
+  return date>=from && date<=to;
+}
+function countEsanor(sites,m,w) {
+  const to=weekEnd(m,w);
+  return sites.filter(s=>(s.esanor||s.m1)&&Math.min(...[s.esanor,s.m1].filter(Boolean).map(d=>d.getTime()))<=to.getTime()&&(!s.site||s.site>to)).length;
+}
+function countSite(sites,m) {
+  const from=new Date(m.y,m.mo,1);
+  const to=new Date(m.y,m.mo+1,0);
+  return sites.filter(s=>s.site&&s.site>=from&&s.site<=to).length;
+}
+
+// ---- FILTER ----
+function onTeamChange() {
+  const team=document.getElementById('filterTeam').value;
+  const sas=[...new Set(allSites.filter(s=>!team||s.team===team).map(s=>s.sa))].sort();
+  const saEl=document.getElementById('filterSA');
+  saEl.innerHTML='<option value="">ทุก SA</option>'+sas.map(s=>`<option value="${s}">${s}</option>`).join('');
+  renderFiltered();
+}
+
+function renderFiltered() {
+  const team    = document.getElementById('filterTeam').value;
+  const sa      = document.getElementById('filterSA').value;
+  const qSite = document.getElementById('searchSite').value.toLowerCase().trim();
+  const qVan  = document.getElementById('searchVan').value; // YYYY-MM-DD
+  const qProv = document.getElementById('searchProvince').value;
+
+  const sites = allSites.filter(s => {
+    if (team  && s.team !== team) return false;
+    if (sa    && s.sa   !== sa)   return false;
+    if (qSite && !s.code.toLowerCase().includes(qSite) && !s.name.toLowerCase().includes(qSite)) return false;
+    if (qVan  && s.vanDate) {
+      const d = s.vanDate;
+      const sVal = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      if (sVal !== qVan) return false;
+    } else if (qVan && !s.vanDate) return false;
+    if (qProv && s.province !== qProv) return false;
+    return true;
+  });
+  renderTable(sites);
+}
+
+// ---- RENDER ----
+function renderTable(sites) {
+  const wrapper=document.getElementById('tableWrapper');
+  if(!sites.length){wrapper.innerHTML='<div style="text-align:center;padding:60px;color:#718096">ไม่มีข้อมูล</div>';return;}
+
+  const months=buildMonths(sites);
+  const MW=months.length*4;
+
+  // Group team → sa → sites
+  const grouped={};
+  sites.forEach(s=>{
+    if(!grouped[s.team])grouped[s.team]={};
+    if(!grouped[s.team][s.sa])grouped[s.team][s.sa]=[];
+    grouped[s.team][s.sa].push(s);
+  });
+
+  const FC_SPAN=6;
+
+  let h='<table>';
+
+  // === HEADER row 1: months ===
+  h+='<thead><tr class="row-months">';
+  h+=`<th class="fc fc0" colspan="6" style="z-index:25;position:sticky;top:0">รายการ</th>`;
+  months.forEach((m,i)=>{
+    const last=i===months.length-1;
+    h+=`<th colspan="4" class="${last?'wlast':''}">${TH_M[m.mo]} ${(m.y-1957)}</th>`;
+  });
+  h+='<th>หมายเหตุ</th></tr>';
+
+  // === HEADER row 2: weeks ===
+  h+='<tr class="row-weeks">';
+  h+='<th class="fc fc0" style="position:sticky;top:29px;z-index:25;text-align:left">Team</th>';
+  h+='<th class="fc fc1" style="position:sticky;top:29px;z-index:25;text-align:left">SA</th>';
+  h+='<th class="fc fc2" style="position:sticky;top:29px;z-index:25;text-align:left">Site Code</th>';
+  h+='<th class="fc fc3" style="position:sticky;top:29px;z-index:25;text-align:left">ชื่อไซท์</th>';
+  h+='<th class="fc fc4" style="position:sticky;top:29px;z-index:25;text-align:left">วันขึ้นรถตู้</th>';
+  h+='<th class="fc fc5" style="position:sticky;top:29px;z-index:25;text-align:left">จังหวัด</th>';
+  months.forEach((_,i)=>{
+    [1,2,3,4].forEach(w=>{ h+=`<th class="${w===4?'wlast':''}">W${w}</th>`; });
+  });
+  h+='<th></th></tr></thead>';
+
+  h+='<tbody>';
+
+  Object.keys(grouped).sort().forEach(team=>{
+    const teamSites=Object.values(grouped[team]).flat();
+
+    // Team header row
+    h+=`<tr class="row-team"><td class="fc fc0" colspan="6">▸ ${team}</td>`;
+    months.forEach(()=>[1,2,3,4].forEach(w=>{ h+=`<td class="${w===4?'wlast':''}"></td>`; }));
+    h+='<td></td></tr>'; // duration
+
+    Object.keys(grouped[team]).sort().forEach(sa=>{
+      const saSites=grouped[team][sa];
+
+      // SA sub-header
+      h+=`<tr class="row-sa"><td class="fc fc0"></td><td class="fc fc1" colspan="5">▸ ${sa}</td>`;
+      months.forEach(()=>[1,2,3,4].forEach(w=>{ h+=`<td class="${w===4?'wlast':''}"></td>`; }));
+      h+='<td></td></tr>'; // duration
+
+      // Sites
+      saSites.forEach(s=>{
+        h+=`<tr class="row-site">`;
+        h+=`<td class="fc fc0" style="font-size:11px;color:#718096">${s.team}</td>`;
+        h+=`<td class="fc fc1" style="font-size:11px;color:#2c5282;font-weight:600">${s.sa}</td>`;
+        h+=`<td class="fc fc2" style="font-size:11px">${s.code}</td>`;
+        h+=`<td class="fc fc3" style="font-size:12px">${s.name}</td>`;
+        h+=`<td class="fc fc4" style="font-size:11px;color:#718096">${fmtFull(s.vanDate)}</td>`;
+        h+=`<td class="fc fc5" style="font-size:11px">${s.province}</td>`;
+        months.forEach(m=>{
+          [1,2,3,4].forEach(w=>{
+            const parts=[];
+            if(inWeek(s.esanor,m,w)) parts.push(`<span class="badge badge-e">${fmtShort(s.esanor)}</span>`);
+            if(inWeek(s.m1,m,w))     parts.push(`<span class="badge badge-m">${fmtShort(s.m1)}</span>`);
+            if(inWeek(s.site,m,w))   parts.push(`<span class="badge badge-s">${fmtShort(s.site)}</span>`);
+            h+=`<td class="${w===4?'wlast':''}">${parts.join('<br>')}</td>`;
+          });
+        });
+        // ระยะเวลา: min(esanor, m1) → vanDate
+        const startD = s.esanor && s.m1 ? (s.esanor < s.m1 ? s.esanor : s.m1) : (s.esanor || s.m1);
+        let durHtml = '';
+        if (startD && s.vanDate) {
+          const days = Math.round((s.vanDate - startD) / 86400000);
+          const col = days <= 30 ? '#276749' : days <= 60 ? '#b7791f' : '#c53030';
+          const bg  = days <= 30 ? '#c6f6d5' : days <= 60 ? '#fefcbf' : '#fed7d7';
+          durHtml = `<span style="font-weight:700;color:${col};background:${bg};padding:2px 7px;border-radius:10px;font-size:12px">${days}</span>`;
+        }
+        h+=`<td style="text-align:center">${durHtml}</td></tr>`;
+      });
+
+      // Total SA — ใบเสนอราคาคงเหลือ
+      h+=`<tr class="row-total-sa-esanor">`;
+      h+=`<td class="fc fc0"></td><td class="fc fc1"></td>`;
+      h+=`<td class="fc fc2" colspan="4" style="text-align:right;padding-right:10px;font-size:11px">ใบเสนอราคาคงเหลือ (${sa})</td>`;
+      months.forEach(m=>{
+        [1,2,3,4].forEach(w=>{
+          const c=countEsanor(saSites,m,w);
+          h+=`<td class="${w===4?'wlast':''} ${c?'cnt-e':'cnt-0'}">${c||''}</td>`;
+        });
+      });
+      h+='<td></td></tr>';
+
+      // Total SA — Site รายเดือน (week 4) + รวมท้าย
+      const totalSiteSA = saSites.filter(s=>s.site).length;
+      h+=`<tr class="row-total-sa-site">`;
+      h+=`<td class="fc fc0"></td><td class="fc fc1"></td>`;
+      h+=`<td class="fc fc2" colspan="4" style="text-align:right;padding-right:10px;font-size:11px">Total Site (${sa})</td>`;
+      months.forEach(m=>{
+        [1,2,3,4].forEach(w=>{
+          if(w===4){
+            const c=countSite(saSites,m);
+            h+=`<td class="wlast ${c?'cnt-s':'cnt-0'}">${c||''}</td>`;
+          } else {
+            h+=`<td></td>`;
+          }
+        });
+      });
+      h+=`<td style="text-align:center;font-weight:800;font-size:13px;background:#c6f6d5;color:#276749">${totalSiteSA}</td>`;
+      h+='</tr>';
+    });
+
+    // Total TEAM — ใบเสนอราคา
+    h+=`<tr class="row-total-team-esanor">`;
+    h+=`<td class="fc fc0" colspan="6" style="text-align:right;padding-right:10px">ใบเสนอราคาคงเหลือ — ${team}</td>`;
+    months.forEach(m=>{
+      [1,2,3,4].forEach(w=>{
+        const c=countEsanor(teamSites,m,w);
+        h+=`<td class="${w===4?'wlast':''} ${c?'cnt-e':'cnt-0'}">${c||''}</td>`;
+      });
+    });
+    h+='<td></td></tr>';
+
+    // Total TEAM — Site รายเดือน (week 4) + รวมท้าย
+    const totalSiteTeam = teamSites.filter(s=>s.site).length;
+    h+=`<tr class="row-total-team-site">`;
+    h+=`<td class="fc fc0" colspan="6" style="text-align:right;padding-right:10px">Total Site — ${team}</td>`;
+    months.forEach(m=>{
+      [1,2,3,4].forEach(w=>{
+        if(w===4){
+          const c=countSite(teamSites,m);
+          h+=`<td class="wlast ${c?'cnt-s':'cnt-0'}">${c||''}</td>`;
+        } else {
+          h+=`<td></td>`;
+        }
+      });
+    });
+    h+=`<td style="text-align:center;font-weight:800;font-size:14px;background:#9ae6b4;color:#1a4731">${totalSiteTeam}</td>`;
+    h+='</tr>';
+
+    // Spacer
+    h+=`<tr class="spacer"><td colspan="${FC_SPAN+MW+1}"></td></tr>`;
+  });
+
+  // === GRAND TOTAL ROW ===
+  h+='<tbody>';
+  // ใบเสนอราคาคงเหลือ grand total per week
+  h+=`<tr style="background:#1a3a5c;color:white;font-weight:700;font-size:13px">`;
+  h+=`<td class="fc fc0" colspan="6" style="background:#1a3a5c;color:white;text-align:right;padding-right:12px;font-size:13px;font-weight:700">🔢 รวมทุกทีม — ใบเสนอราคาคงเหลือ</td>`;
+  months.forEach(m=>{
+    [1,2,3,4].forEach(w=>{
+      const c=countEsanor(sites,m,w);
+      h+=`<td class="${w===4?'wlast':''}" style="text-align:center;color:${c?'#f6c90e':'rgba(255,255,255,0.3)'};font-weight:800">${c||''}</td>`;
+    });
+  });
+  const grandDurTotal = '';
+  h+=`<td></td></tr>`;
+
+  // Total Site grand total per month + overall
+  const grandSiteTotal = sites.filter(s=>s.site).length;
+  h+=`<tr style="background:#276749;color:white;font-weight:700;font-size:13px">`;
+  h+=`<td class="fc fc0" colspan="6" style="background:#276749;color:white;text-align:right;padding-right:12px;font-size:13px;font-weight:700">✅ รวมทุกทีม — Total Site</td>`;
+  months.forEach(m=>{
+    [1,2,3,4].forEach(w=>{
+      if(w===4){
+        const c=countSite(sites,m);
+        h+=`<td class="wlast" style="text-align:center;color:${c?'#9ae6b4':'rgba(255,255,255,0.3)'};font-weight:800">${c||''}</td>`;
+      } else {
+        h+=`<td></td>`;
+      }
+    });
+  });
+  h+=`<td style="text-align:center;font-size:16px;font-weight:900;color:#9ae6b4">${grandSiteTotal}</td>`;
+  h+='</tr>';
+  h+='</tbody>';
+
+  h+='</tbody></table>';
+  wrapper.innerHTML=h;
+}
+
+// ---- PASSWORD ----
+function checkPass() {
+  const val = document.getElementById('gateInput').value;
+  const inp = document.getElementById('gateInput');
+  if (val === 'CJXsx2026') {
+    document.getElementById('gateOverlay').style.display = 'none';
+    loadData();
+  } else {
+    inp.classList.add('error');
+    document.getElementById('gateErr').textContent = 'รหัสผ่านไม่ถูกต้อง';
+    setTimeout(() => inp.classList.remove('error'), 400);
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+// ---- LOAD ----
+async function loadData() {
+  const btn=document.getElementById('refreshBtn');
+  const spin=document.getElementById('spinIcon');
+  btn.disabled=true; spin.classList.add('loading');
+
+  let raw=null; let mock=false;
+  try {
+    const res=await fetch(API_URL+'?nocache='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data)||data.length<2) throw new Error('empty');
+    raw=data;
+  } catch(e) { raw=MOCK; mock=true; }
+
+  // Debug columns — ลบออกหลัง verify แล้ว
+  if (raw.length > 1) {
+    const h = raw[0]; const r = raw[1];
+    console.table(h.map((col,i) => ({col, value: r[i]})));
+  }
+  allSites=parseRows(raw);
+
+  // Populate filters
+  const teams=[...new Set(allSites.map(s=>s.team))].sort();
+  document.getElementById('filterTeam').innerHTML='<option value="">ทุก Team</option>'+teams.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('filterSA').innerHTML='<option value="">ทุก SA</option>';
+  // Populate province dropdown
+  const provs = [...new Set(allSites.map(s=>s.province).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
+  document.getElementById('searchProvince').innerHTML='<option value="">📍 ทุกจังหวัด</option>'+provs.map(p=>`<option value="${p}">${p}</option>`).join('');
+
+  document.getElementById('mockWarn').innerHTML = mock
+    ? '<div class="mock-warn">⚠️ แสดงข้อมูล Mock — ยังไม่ได้เชื่อมต่อ Google Sheets จริง</div>' : '';
+
+  renderFiltered();
+
+  const now=new Date();
+  document.getElementById('lastUpdated').textContent=
+    'อัปเดตล่าสุด: '+now.toLocaleDateString('th-TH')+' '+now.toLocaleTimeString('th-TH');
+  btn.disabled=false; spin.classList.remove('loading');
+}
+
+// loadData() called after password check
+</script>
+</body>
+</html>
