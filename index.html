@@ -248,7 +248,8 @@ function parseDate(str) {
   // YYYY-MM-DD
   m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  const d = new Date(str); return isNaN(d) ? null : d;
+  // ไม่รู้จัก format → ถือว่าว่าง
+  return null;
 }
 const TH_M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const fmtShort = d => d ? `${d.getDate()} ${TH_M[d.getMonth()]}` : '';
@@ -290,7 +291,7 @@ function inWeek(date,m,w) {
 }
 function countEsanor(sites,m,w) {
   const to=weekEnd(m,w);
-  return sites.filter(s=>(s.esanor||s.m1)&&Math.min(...[s.esanor,s.m1].filter(Boolean).map(d=>d.getTime()))<=to.getTime()&&(!s.site||s.site>to)).length;
+  return sites.filter(s=>s.esanor&&s.esanor<=to&&(!s.site||s.site>to)).length;
 }
 function countSite(sites,m) {
   const from=new Date(m.y,m.mo,1);
