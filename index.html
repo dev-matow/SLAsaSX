@@ -181,6 +181,12 @@
 <div class="topbar">
   <div class="topbar-title">📍 SLA Tracker — <span>CJ Mart</span></div>
   <div class="topbar-controls">
+    <select id="filterDiv" onchange="onDivChange()" style="padding:6px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:white;font-size:13px;cursor:pointer;outline:none;">
+      <option value="">ทุกฝ่าย</option>
+      <option value="ฝ่าย EFG">ฝ่าย EFG</option>
+      <option value="ฝ่าย DBH">ฝ่าย DBH</option>
+      <option value="ฝ่าย ACI">ฝ่าย ACI</option>
+    </select>
     <select id="filterTeam" onchange="onTeamChange()"><option value="">ทุก Team</option></select>
     <select id="filterSA"   onchange="renderFiltered()"><option value="">ทุก SA</option></select>
     <input id="searchSite" type="text" placeholder="🔍 Site Code / ชื่อไซท์..." oninput="renderFiltered()"
@@ -300,6 +306,17 @@ function countSite(sites,m) {
 }
 
 // ---- FILTER ----
+function onDivChange() {
+  const div = document.getElementById('filterDiv').value;
+  const teams = [...new Set(allSites.map(s=>s.team))].sort();
+  const allowedTeams = div ? DIVISIONS[div] : null;
+  const filtered = allowedTeams ? teams.filter(t => allowedTeams.some(d => t.includes(d))) : teams;
+  const teamEl = document.getElementById('filterTeam');
+  teamEl.innerHTML = '<option value="">ทุก Team</option>' + filtered.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('filterSA').innerHTML = '<option value="">ทุก SA</option>';
+  renderFiltered();
+}
+
 function onTeamChange() {
   const team=document.getElementById('filterTeam').value;
   const sas=[...new Set(allSites.filter(s=>!team||s.team===team).map(s=>s.sa))].sort();
@@ -308,14 +325,23 @@ function onTeamChange() {
   renderFiltered();
 }
 
+const DIVISIONS = {
+  'ฝ่าย EFG': ['E','F','G'],
+  'ฝ่าย DBH': ['D','B','H'],
+  'ฝ่าย ACI': ['A','C','I'],
+};
+
 function renderFiltered() {
+  const div     = document.getElementById('filterDiv').value;
   const team    = document.getElementById('filterTeam').value;
   const sa      = document.getElementById('filterSA').value;
+  const allowedTeams = div ? DIVISIONS[div] : null;
   const qSite = document.getElementById('searchSite').value.toLowerCase().trim();
   const qVan  = document.getElementById('searchVan').value; // YYYY-MM-DD
   const qProv = document.getElementById('searchProvince').value;
 
   const sites = allSites.filter(s => {
+    if (allowedTeams && !allowedTeams.some(d => s.team.includes(d))) return false;
     if (team  && s.team !== team) return false;
     if (sa    && s.sa   !== sa)   return false;
     if (qSite && !s.code.toLowerCase().includes(qSite) && !s.name.toLowerCase().includes(qSite)) return false;
